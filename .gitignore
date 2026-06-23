@@ -145,3 +145,6 @@ vite.config.ts.timestamp-*
 # Project-specific data files
 users.json
 /src/generated/prisma
+
+# SQLite database files
+*.db

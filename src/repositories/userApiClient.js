@@ -1,6 +1,7 @@
 
-const BACKEND_GET_USER_BY_EMAIL_URL = 'http://localhost:4000/users?email=';
-const BACKEND_REGISTER_URL = 'http://localhost:4000/users';
+const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://localhost:4000';
+const BACKEND_GET_USER_BY_EMAIL_URL = `${USER_SERVICE_URL}/users?email=`;
+const BACKEND_REGISTER_URL = `${USER_SERVICE_URL}/users`;
 export const userRepository = {
     async findByEmail(email) {
         try {

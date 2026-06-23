@@ -5,11 +5,15 @@ export function generateToken(userId) {
     const secret = process.env.JWT_SECRET;
     const options = { expiresIn: '7d' };
 
-    return jwt.sign(payload, secret, options);
+    const token = jwt.sign(payload, secret, options);
+    console.log(`🔑 [jwtHelper] 為使用者 ${userId} 簽發新 token（效期 7 天）`);
+
+    return token;
 }
 
 export function verifyToken(token) {
     const secret = process.env.JWT_SECRET;
 
+    console.log('🔍 [jwtHelper] verifyToken 被呼叫（目前沒有路由實際使用這個函式）');
     return jwt.verify(token, secret);
 }
