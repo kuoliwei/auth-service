@@ -1,0 +1,104 @@
+schema: spec-driven
+
+# Project context
+# 顯示給 AI 在建立/修改 openspec 文件時參考。本檔描述的是 auth-service「當前實際」的架構，
+# 不是理想版——刻意記錄遺留代碼與隱藏耦合，因為它們正是後續「規格驅動優化」的對象。
+context: |
+  ## auth-service（Persona Nexus 平台的認證服務）
+
+  類 Character.ai 的 AI 角色扮演平台其中一個微服務。本服務只負責**註冊**與**登入**、簽發 JWT。
+  學習性質專案，協作偏好「教學引導、讓使用者自己動手」——解釋原理、給方向，不直接貼完整程式碼。
+
+  ### 技術棧
+  Node.js 20+ ／ Express 5 ／ ESM modules ／ bcrypt（密碼雜湊）／ jsonwebtoken（JWT）
+  ／ zod（輸入驗證）／ Jest + Babel（測試）。**本服務沒有自己的資料庫**。
+
+  ### 當前架構（三層 + 一個 middleware）
+  ```
+  瀏覽器 → api-gateway(8000) → auth-service(3000)
+                                   │
+        app.js（路由 + CORS + validateMiddleware）
+                                   ↓
+        controllers/authController.js（HTTP 進出、錯誤碼→HTTP status）
+                                   ↓
+        services/authService.js（業務邏輯：查重、bcrypt、簽 JWT）
+                                   ↓
+        repositories/userApiClient.js（HTTP fetch → user-service(4000)）
+                                   ↓
+                              user-service(4000)  ← 真正存使用者的地方
+  ```
+  輔助模組：`schemas/authSchema.js`（zod registerSchema）、`utils/jwtHelper.js`（簽/驗 JWT）。
+
+  ### 對外 API（兩條路由，皆掛 validateMiddleware）
+  - `POST /api/v1/auth/register` → 201 `{ id, email }`
+  - `POST /api/v1/auth/login`    → 200 `{ id, email, token }`
+  （對外經 gateway，可能 rewrite 路徑；`/api/v1/` 為服務內部實際路徑）
+
+  ### 錯誤碼（Service 拋語意錯誤，Controller 轉 HTTP status）
+  | 錯誤碼 | HTTP | 含義 |
+  |---|---|---|
+  | EMAIL_ALREADY_EXISTS | 400 | 註冊時 email 已存在 |
+  | UNKNOWN_USER | 400 | 登入時 email 不存在 |
+  | EMAIL_OR_PASSWORD_NOTMATCH | 400 | 登入時密碼錯誤 |
+  | UNKNOWN_SERVER_ERROR | 500 | 非預期錯誤 |
+  註：驗證失敗（email 格式 / 密碼 < 6）由 validateMiddleware 直接回 400，訊息籠統為
+  「EMAIL或密碼格式不正確」，**沒有**結構化錯誤碼（無 INVALID_EMAIL / MISSING_REQUIRED_FIELDS）。
+
+  ### 密碼與 JWT
+  - bcrypt saltRounds=10；明文密碼從不落地、不出現在回應。
+  - JWT 由 `jwtHelper.generateToken()` 用 `JWT_SECRET` 簽，payload 僅 `{ id }`，效期 7 天。
+  - 此 `JWT_SECRET` 必須與 api-gateway 的 `.env` 一致（gateway 負責驗 JWT）。
+
+  ### 環境變數
+  - `JWT_SECRET`（必須與 gateway 一致）
+  - `USER_SERVICE_URL`（預設 http://localhost:4000）
+  - PORT 目前寫死在 app.js = 3000（未讀 env）
+
+  ### 架構原則（平台層級）
+  - 前端一律打 gateway，不直接調用後端。
+  - JWT 驗證集中在 gateway；後端服務信任 gateway 注入的 header，本身不驗 JWT
+    （auth-service 例外：它負責「簽發」，但不「驗證」）。
+  - 三層架構：Controller（HTTP）→ Service（業務）→ Repository（存取）。
+  - 錯誤碼語義化：Service 拋語意錯誤，Controller 映射 HTTP status。
+
+  ### 遺留代碼 / 隱藏耦合（後續優化靶子，勿當成正常設計）
+  - `middlewares/authMiddleware.js`（17 行）**未被任何路由掛載**——JWT 驗證已移到 gateway。
+  - `jwtHelper.verifyToken()` **無人呼叫**（函式內 log 已自述）。
+  - `authController.me()` 方法存在但**未掛路由**。
+  - `users.json`（內容 `[]`）是最早明文儲存的死檔，現已改走 HTTP。
+  - `validateMiddleware` 同時掛在 register 與 login，卻固定用 `registerSchema`
+    → **登入也被強制驗證密碼 ≥ 6**，這是隱藏耦合。
+  - `app.js` 的 CORS 只允許 `http://localhost:8000`，但程式碼註解誤寫成 5173。
+  - `PORT` 寫死在 app.js，未走 env（與其他服務慣例不一致）。
+
+  ### 測試現況（實跑 npx jest 驗證）
+  - `authController.test.js`：8 個測試通過。
+  - `authService.test.js`：**整個 suite 掛掉**——它 mock 的是 `../repositories/userRepository.js`，
+    但真正的檔案叫 `userApiClient.js`，路徑不存在。要修：把測試裡的 userRepository 全改成 userApiClient。
+  - `userApiClient.js` 本身無單元測試。
+
+  ### 協作約定
+  - 學習導向，優先解釋原理與設計思考。
+  - `.env` 與 `.env.example` 應同步；跨服務祕鑰（JWT_SECRET）必須一致。
+  - 本服務是獨立 git repo（非 monorepo），remote 為 github.com/kuoliwei/auth-service。
+
+# Per-artifact rules
+rules:
+  proposal:
+    - 中文撰寫，200-500 字為宜
+    - 包含「為什麼做」(Why)、「變更清單」(What Changes)、「影響範圍」(Impact)
+    - 若動到 API/錯誤碼/環境變數，清楚列舉新增或移除項
+    - 修改既有行為要說明向後相容性
+  specs:
+    - 使用 Given/When/Then scenario 格式，每個 Requirement 至少一個 Scenario
+    - RFC 2119 關鍵字（MUST/SHALL/SHOULD/MAY）標示需求強度
+    - API 變更要有完整 Request/Response JSON 例子
+    - 錯誤處理列舉所有 error code 與對應 HTTP status
+    - Delta Spec 格式分 ADDED / MODIFIED / REMOVED 三節
+  design:
+    - 架構決策與權衡說明；服務間通信畫文本流程或時序
+    - 明確標示「當前」與「優化後」的差異（架構圖前後對照）
+  tasks:
+    - 每個任務控制在 2-3 小時內可完成
+    - 層級清楚（子任務縮排），標示依賴關係
+    - 檢查項包含單元測試與文件更新

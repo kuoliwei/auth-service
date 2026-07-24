@@ -1,26 +1,27 @@
-# 【登入請求】
-# POST：新增/提交資料用的 HTTP 方法
-# Content-Type: application/json：告訴伺服器我傳的資料格式是 JSON
-POST http://localhost:3000/api/v1/auth/login
+# auth-service 手動測試（直接打 :3000，未經 gateway；CORS 需用瀏覽器才測得到）
+# 測試帳號：tester@example.com / test123456
+# 注意：案例 1「成功註冊」只有第一次會成功；再次執行會變成案例 2（email 已存在）。
+#       若要重跑乾淨的成功註冊，請改一個沒用過的 email。
+
+### 1. 成功註冊 → 期望 201「註冊成功！」，data:{ id, email }
+POST http://localhost:3000/api/v1/auth/register
 Content-Type: application/json
 
 {
-  "email": "kuo@gmail.com",
-  "password": "123456"
+  "email": "tester@example.com",
+  "password": "test123456"
 }
 
-### （分隔線，用來區隔多個請求）
+### 2. 重複註冊（email 已存在）→ 期望 400「該電子郵件已被註冊，請更換帳號。」
+POST http://localhost:3000/api/v1/auth/register
+Content-Type: application/json
 
-# 【取得目前登入使用者資訊】（受保護路由，需要 Token）
-# GET：取得資料用的 HTTP 方法，不需要帶 Body
-# Authorization: 認證用的 Header
-# Bearer：固定格式前綴，代表「持有者」，是業界標準規範
-# Bearer 後面接的那一長串就是登入後拿到的 JWT Token
-GET http://localhost:3000/api/v1/auth/me
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InVzcl8xNzc5NjgzMTYzMTA3IiwiaWF0IjoxNzc5ODQ4MTI4LCJleHAiOjE3ODA0NTI5Mjh9.JC6fuhVxX0S-DZV0eHkVHrmF2k_OyPalNEU1s8EibEk
+{
+  "email": "tester@example.com",
+  "password": "test123456"
+}
 
-###
-# 模擬使用錯誤格式註冊
+### 3. 註冊格式錯誤（密碼 5 碼）→ 期望 400「EMAIL或密碼格式不正確」（register 仍驗格式）
 POST http://localhost:3000/api/v1/auth/register
 Content-Type: application/json
 
@@ -29,12 +30,38 @@ Content-Type: application/json
   "password": "12345"
 }
 
-###
-# 模擬使用錯誤格式登入
+### 4. 成功登入 → 期望 200「登入成功！」，data:{ id, email, token }
 POST http://localhost:3000/api/v1/auth/login
 Content-Type: application/json
 
 {
-  "email": "liwei@gmail.com",
-  "password": "789456"
+  "email": "tester@example.com",
+  "password": "test123456"
+}
+
+### 5. 登入-密碼錯誤（email 存在、密碼錯）→ 期望 400「Email或密碼錯誤，請輸入正確的Email或密碼。」
+POST http://localhost:3000/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "tester@example.com",
+  "password": "wrongpassword"
+}
+
+### 6. 登入-email 不存在 → 期望 400「Email或密碼錯誤，請輸入正確的Email或密碼。」
+POST http://localhost:3000/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "nobody@test.com",
+  "password": "whatever123"
+}
+
+### 7. 登入-短密碼（驗證 login 不再驗格式）→ 期望 400「Email或密碼錯誤」（不是「格式不正確」）
+POST http://localhost:3000/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "nobody@test.com",
+  "password": "123"
 }

@@ -5,8 +5,7 @@ import { authService } from '../services/authService.js';
 jest.mock('../services/authService.js', () => ({
   authService: {
     register: jest.fn(),
-    login: jest.fn(),
-    me: jest.fn()
+    login: jest.fn()
   }
 }));
 
@@ -22,40 +21,7 @@ describe('AuthController (門神層) 單元測試', () => {
     };
   });
 
-  // // 【測試案例一：漏填密碼，直接在門口亂棍轟出去】
-  // test('當沒輸入 password 時，應直接回傳 HTTP 400', async () => {
-  //   req.body = { email: 'only_email@test.com' }; // 故意漏填密碼
-
-  //   await authController.register(req, res);
-
-  //   // 斷言：Controller 應該要擺臭臉給 400 狀態碼
-  //   expect(res.status).toHaveBeenCalledWith(400);
-  //   // 斷言：回應的錯誤訊息應該要符合預期
-  //   expect(res.json).toHaveBeenCalledWith({
-  //     status: 'error',
-  //     message: '請輸入完整的帳號與密碼。'
-  //   });
-  //   // 斷言：既然在門口就被擋了，絕對不准去呼叫後方的大腦（Service）
-  //   expect(authService.register).not.toHaveBeenCalled();
-  // });
-  // // 【測試案例二：漏填email，直接在門口亂棍轟出去】
-  // test('當沒輸入 email 時，應直接回傳 HTTP 400', async () => {
-  //   req.body = { password: 'password123' }; // 故意漏填email
-
-  //   await authController.register(req, res);
-
-  //   // 斷言：Controller 應該要擺臭臉給 400 狀態碼
-  //   expect(res.status).toHaveBeenCalledWith(400);
-  //   // 斷言：回應的錯誤訊息應該要符合預期
-  //   expect(res.json).toHaveBeenCalledWith({
-  //     status: 'error',
-  //     message: '請輸入完整的帳號與密碼。'
-  //   });
-  //   // 斷言：既然在門口就被擋了，絕對不准去呼叫後方的大腦（Service）
-  //   expect(authService.register).not.toHaveBeenCalled();
-  // });
-
-  // 【測試案例三：資料齊全，順利放行並帶回好消息】
+  // 【測試案例一：資料齊全，順利放行並帶回好消息】
   test('當資料齊全且註冊成功，應回傳 HTTP 201 與用戶資料', async () => {
     req.body = { email: 'good@test.com', password: 'password123' };
 
@@ -72,7 +38,7 @@ describe('AuthController (門神層) 單元測試', () => {
       data: { id: 'usr_9527', email: 'good@test.com' }
     });
   });
-  // 【測試案例四：email已經存在資料庫中】
+  // 【測試案例二：email已經存在資料庫中】
   test('使用者輸入的 email 已經存在資料庫中，應直接回傳 HTTP 400', async () => {
     req.body = { email: 'good@test.com', password: 'password123' };
 
@@ -89,7 +55,7 @@ describe('AuthController (門神層) 單元測試', () => {
       message: '該電子郵件已被註冊，請更換帳號。'
     });
   });
-  // 【測試案例五：意料外的未知錯誤】
+  // 【測試案例三：意料外的未知錯誤】
   test('意料外的未知錯誤，應直接回傳 HTTP 500', async () => {
     req.body = { email: 'good@test.com', password: 'password123' };
 
@@ -106,7 +72,7 @@ describe('AuthController (門神層) 單元測試', () => {
       message: '伺服器內部發生錯誤，請稍後再試。'
     });
   });
-  // 【測試案例六：資料齊全，順利放行並帶回好消息】
+  // 【測試案例四：資料齊全，順利放行並帶回好消息】
   test('當資料齊全且登入成功，應回傳 HTTP 200 與用戶資料', async () => {
     req.body = { email: 'good@test.com', password: 'password123' };
 
@@ -131,7 +97,7 @@ describe('AuthController (門神層) 單元測試', () => {
       }
     });
   });
-  // 【測試案例七：未知使用者】
+  // 【測試案例五：未知使用者】
   test('使用者輸入的 email 不存在資料庫中，應直接回傳 HTTP 400', async () => {
     req.body = { email: 'good@test.com', password: 'password123' };
 
@@ -148,7 +114,7 @@ describe('AuthController (門神層) 單元測試', () => {
       message: 'Email或密碼錯誤，請輸入正確的Email或密碼。'
     });
   });
-  // 【測試案例八：未知使用者】
+  // 【測試案例六：密碼錯誤】
   test('使用者輸入的密碼錯誤，應直接回傳 HTTP 400', async () => {
     req.body = { email: 'good@test.com', password: 'password123' };
 
@@ -165,7 +131,7 @@ describe('AuthController (門神層) 單元測試', () => {
       message: 'Email或密碼錯誤，請輸入正確的Email或密碼。'
     });
   });
-  // 【測試案例九：意料外的未知錯誤】
+  // 【測試案例七：意料外的未知錯誤】
   test('意料外的未知錯誤，應直接回傳 HTTP 500', async () => {
     req.body = { email: 'good@test.com', password: 'password123' };
 
@@ -180,21 +146,6 @@ describe('AuthController (門神層) 單元測試', () => {
     expect(res.json).toHaveBeenCalledWith({
       status: 'error',
       message: '伺服器內部發生錯誤，請稍後再試。'
-    });
-  });
-  // 【測試案例十：使用者取得資料】
-  test('使用者使用正確token取得資料，應直接回傳 HTTP 200', async () => {
-    req.body = { email: 'good@test.com', password: 'password123' };
-    req.user = { id: 'usr_9527', email: 'good@test.com' };
-    await authController.me(req, res);
-
-    // 斷言：Controller 應該要給 200 狀態碼
-    expect(res.status).toHaveBeenCalledWith(200);
-    // 斷言：回應使用者成功取得資料
-    expect(res.json).toHaveBeenCalledWith({
-      status: 'success',
-      message: '取得使用者資訊成功',
-      data: req.user
     });
   });
 });

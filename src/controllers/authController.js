@@ -1,5 +1,20 @@
 import { authService } from '../services/authService.js';
 
+// 錯誤碼 → HTTP 回應對應表。新增錯誤碼只需在此加一筆，無需改動 controller 邏輯。
+const ERROR_MAP = {
+  EMAIL_ALREADY_EXISTS: { status: 400, message: '該電子郵件已被註冊，請更換帳號。' },
+  UNKNOWN_USER: { status: 400, message: 'Email或密碼錯誤，請輸入正確的Email或密碼。' },
+  EMAIL_OR_PASSWORD_NOTMATCH: { status: 400, message: 'Email或密碼錯誤，請輸入正確的Email或密碼。' }
+};
+const FALLBACK_ERROR = { status: 500, message: '伺服器內部發生錯誤，請稍後再試。' };
+
+// 依語意錯誤碼查表回應；未命中一律回退為 500。
+function respondError(res, error) {
+  console.error('💥 [崩潰] 核心層拋出錯誤！錯誤訊息：', error.message);
+  const mapped = ERROR_MAP[error.message] || FALLBACK_ERROR;
+  return res.status(mapped.status).json({ status: 'error', message: mapped.message });
+}
+
 export const authController = {
   /**
    * 處理註冊請求的門神函式
@@ -31,25 +46,7 @@ export const authController = {
       });
 
     } catch (error) {
-      // 5. 錯誤包裝
-      console.error('💥 [崩潰] 核心層拋出錯誤！錯誤訊息：', error.message);
-
-      if (error.message === 'EMAIL_ALREADY_EXISTS') {
-        console.warn('❌ [業務退件] 判定此 Email 已存在，阻擋註冊。');
-        console.log('==================================================');
-        return res.status(400).json({
-          status: 'error',
-          message: '該電子郵件已被註冊，請更換帳號。'
-        });
-      }
-
-      // 處理其他未知的系統錯誤（HTTP 500）
-      console.error('🚨 [系統天災] 觸發未知錯誤（如硬碟爆掉、語法崩潰），回傳 500。');
-      console.log('==================================================');
-      return res.status(500).json({
-        status: 'error',
-        message: '伺服器內部發生錯誤，請稍後再試。'
-      });
+      return respondError(res, error);
     }
   },
   /**
@@ -81,40 +78,7 @@ export const authController = {
       });
 
     } catch (error) {
-      // 5. 錯誤包裝
-      console.error('💥 [崩潰] 核心層拋出錯誤！錯誤訊息：', error.message);
-
-      if (error.message === 'UNKNOWN_USER') {
-        console.warn('❌ [業務退件] 判定此 Email 不存在，阻擋登入。');
-        console.log('==================================================');
-        return res.status(400).json({
-          status: 'error',
-          message: 'Email或密碼錯誤，請輸入正確的Email或密碼。'
-        });
-      }
-      else if (error.message === 'EMAIL_OR_PASSWORD_NOTMATCH') {
-        console.warn('❌ 密碼錯誤，阻擋登入。');
-        console.log('==================================================');
-        return res.status(400).json({
-          status: 'error',
-          message: 'Email或密碼錯誤，請輸入正確的Email或密碼。'
-        });
-      }
-
-      // 處理其他未知的系統錯誤（HTTP 500）
-      console.error('🚨 [系統天災] 觸發未知錯誤（如硬碟爆掉、語法崩潰），回傳 500。');
-      console.log('==================================================');
-      return res.status(500).json({
-        status: 'error',
-        message: '伺服器內部發生錯誤，請稍後再試。'
-      });
+      return respondError(res, error);
     }
-  },
-  me(req, res) {
-    return res.status(200).json({
-      status: 'success',
-      message: '取得使用者資訊成功',
-      data: req.user
-    });
   }
 };

@@ -10,10 +10,3 @@ export function generateToken(userId) {
 
     return token;
 }
-
-export function verifyToken(token) {
-    const secret = process.env.JWT_SECRET;
-
-    console.log('🔍 [jwtHelper] verifyToken 被呼叫（目前沒有路由實際使用這個函式）');
-    return jwt.verify(token, secret);
-}

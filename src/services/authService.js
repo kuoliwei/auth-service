@@ -1,4 +1,4 @@
-import { userRepository } from '../repositories/userApiClient.js';
+import { userRepository } from '../repositories/userRepository.js';
 import bcrypt from 'bcrypt';
 import { generateToken } from '../utils/jwtHelper.js'
 
@@ -27,7 +27,7 @@ export const authService = {
         password: hashedPassword // 密碼已改為加密後，不再儲存明文密碼
       };
 
-      // 3. 下令存檔：叫倉管把這個新用戶存進 users.json
+      // 3. 下令存檔：叫倉管透過 user-service 儲存這個新用戶
       const savedUser = await userRepository.save(newUser);
 
       // 4. 回傳成果：把存好的用戶資料（不包含密碼）丟回給 Controller
