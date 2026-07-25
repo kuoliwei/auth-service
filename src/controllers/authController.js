@@ -11,8 +11,11 @@ const FALLBACK_ERROR = { status: 500, message: '伺服器內部發生錯誤，�
 // 依語意錯誤碼查表回應；未命中一律回退為 500。
 function respondError(res, error) {
   console.error('💥 [崩潰] 核心層拋出錯誤！錯誤訊息：', error.message);
-  const mapped = ERROR_MAP[error.message] || FALLBACK_ERROR;
-  return res.status(mapped.status).json({ status: 'error', message: mapped.message });
+  const mapped = ERROR_MAP[error.message];
+  if (mapped) {
+    return res.status(mapped.status).json({ error: error.message, message: mapped.message });
+  }
+  return res.status(FALLBACK_ERROR.status).json({ error: 'INTERNAL_SERVER_ERROR', message: FALLBACK_ERROR.message });
 }
 
 export const authController = {
@@ -39,11 +42,7 @@ export const authController = {
       console.log(`🆔 [產出 ID]: ${result.id}`);
       console.log('==================================================');
 
-      return res.status(201).json({
-        status: 'success',
-        message: '註冊成功！',
-        data: result
-      });
+      return res.status(201).json(result);
 
     } catch (error) {
       return respondError(res, error);
@@ -71,11 +70,7 @@ export const authController = {
       console.log('🎉 [成功] Service 處理完畢，新用戶已成功登入！');
       console.log('==================================================');
 
-      return res.status(200).json({
-        status: 'success',
-        message: '登入成功！',
-        data: result
-      });
+      return res.status(200).json(result);
 
     } catch (error) {
       return respondError(res, error);
