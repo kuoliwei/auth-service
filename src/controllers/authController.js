@@ -2,7 +2,7 @@ import { authService } from '../services/authService.js';
 
 // 錯誤碼 → HTTP 回應對應表。新增錯誤碼只需在此加一筆，無需改動 controller 邏輯。
 const ERROR_MAP = {
-  EMAIL_ALREADY_EXISTS: { status: 400, message: '該電子郵件已被註冊，請更換帳號。' },
+  EMAIL_ALREADY_EXISTS: { status: 409, message: '該電子郵件已被註冊，請更換帳號。' },
   UNKNOWN_USER: { status: 400, message: 'Email或密碼錯誤，請輸入正確的Email或密碼。' },
   EMAIL_OR_PASSWORD_NOTMATCH: { status: 400, message: 'Email或密碼錯誤，請輸入正確的Email或密碼。' }
 };

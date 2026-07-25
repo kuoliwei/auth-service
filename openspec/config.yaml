@@ -17,32 +17,34 @@ context: |
   ```
   瀏覽器 → api-gateway(8000) → auth-service(3000)
                                    │
-        app.js（路由 + CORS + validateMiddleware）
+        app.js（路由 + CORS + validateMiddleware，僅掛 register）
                                    ↓
-        controllers/authController.js（HTTP 進出、錯誤碼→HTTP status）
+        controllers/authController.js（HTTP 進出、ERROR_MAP 查表→HTTP status）
                                    ↓
         services/authService.js（業務邏輯：查重、bcrypt、簽 JWT）
                                    ↓
-        repositories/userApiClient.js（HTTP fetch → user-service(4000)）
+        repositories/userRepository.js（HTTP fetch → api-gateway /internal/users）
                                    ↓
-                              user-service(4000)  ← 真正存使用者的地方
+                    api-gateway(8000) /internal/users → user-service(4000)  ← 真正存使用者的地方
   ```
-  輔助模組：`schemas/authSchema.js`（zod registerSchema）、`utils/jwtHelper.js`（簽/驗 JWT）。
+  輔助模組：`schemas/authSchema.js`（zod registerSchema）、`utils/jwtHelper.js`（僅 `generateToken()`，簽發不驗證）。
 
-  ### 對外 API（兩條路由，皆掛 validateMiddleware）
-  - `POST /api/v1/auth/register` → 201 `{ id, email }`
-  - `POST /api/v1/auth/login`    → 200 `{ id, email, token }`
+  ### 對外 API
+  - `POST /api/v1/auth/register` → validateMiddleware → 201 直接物件 `{ id, email }`（無包裝）
+  - `POST /api/v1/auth/login`    → 不驗格式 → 200 直接物件 `{ id, email, token }`（無包裝）
   （對外經 gateway，可能 rewrite 路徑；`/api/v1/` 為服務內部實際路徑）
 
-  ### 錯誤碼（Service 拋語意錯誤，Controller 轉 HTTP status）
+  ### 錯誤碼（Service 拋語意錯誤，Controller 以 ERROR_MAP 轉 HTTP status）
   | 錯誤碼 | HTTP | 含義 |
   |---|---|---|
-  | EMAIL_ALREADY_EXISTS | 400 | 註冊時 email 已存在 |
+  | EMAIL_ALREADY_EXISTS | 409 | 註冊時 email 已存在 |
   | UNKNOWN_USER | 400 | 登入時 email 不存在 |
   | EMAIL_OR_PASSWORD_NOTMATCH | 400 | 登入時密碼錯誤 |
-  | UNKNOWN_SERVER_ERROR | 500 | 非預期錯誤 |
+  | （未命中 ERROR_MAP，如 UNKNOWN_SERVER_ERROR） | 500 | 非預期錯誤 |
+  錯誤回應 body 為 `{ error, message }`（`error` 為語意錯誤碼字串，未命中時固定 `INTERNAL_SERVER_ERROR`）。
   註：驗證失敗（email 格式 / 密碼 < 6）由 validateMiddleware 直接回 400，訊息籠統為
-  「EMAIL或密碼格式不正確」，**沒有**結構化錯誤碼（無 INVALID_EMAIL / MISSING_REQUIRED_FIELDS）。
+  「EMAIL或密碼格式不正確」，body 仍是舊版 `{status:"error",message}` 包裝（尚未隨其他路徑改成 `{error,message}`），
+  也**沒有**結構化錯誤碼（無 INVALID_EMAIL / MISSING_REQUIRED_FIELDS）。
 
   ### 密碼與 JWT
   - bcrypt saltRounds=10；明文密碼從不落地、不出現在回應。
@@ -51,31 +53,27 @@ context: |
 
   ### 環境變數
   - `JWT_SECRET`（必須與 gateway 一致）
-  - `USER_SERVICE_URL`（預設 http://localhost:4000）
-  - PORT 目前寫死在 app.js = 3000（未讀 env）
+  - `GATEWAY_URL`（預設 http://localhost:8000）——`userRepository.js` 經此打 gateway 的 `/internal/users`，不直連 user-service
+  - `PORT`（預設 3000）
+  - `CORS_ORIGIN`（預設 http://localhost:8000）
 
   ### 架構原則（平台層級）
-  - 前端一律打 gateway，不直接調用後端。
+  - 前端一律打 gateway，不直接調用後端；服務間通訊（本服務→user-service）也一律經 gateway 的 `/internal/*` 轉發，不直連。
   - JWT 驗證集中在 gateway；後端服務信任 gateway 注入的 header，本身不驗 JWT
     （auth-service 例外：它負責「簽發」，但不「驗證」）。
   - 三層架構：Controller（HTTP）→ Service（業務）→ Repository（存取）。
-  - 錯誤碼語義化：Service 拋語意錯誤，Controller 映射 HTTP status。
+  - 錯誤碼語義化：Service 拋語意錯誤，Controller 以 ERROR_MAP 查表映射 HTTP status（OCP：新增錯誤碼免改 controller 邏輯）。
 
-  ### 遺留代碼 / 隱藏耦合（後續優化靶子，勿當成正常設計）
-  - `middlewares/authMiddleware.js`（17 行）**未被任何路由掛載**——JWT 驗證已移到 gateway。
-  - `jwtHelper.verifyToken()` **無人呼叫**（函式內 log 已自述）。
-  - `authController.me()` 方法存在但**未掛路由**。
-  - `users.json`（內容 `[]`）是最早明文儲存的死檔，現已改走 HTTP。
-  - `validateMiddleware` 同時掛在 register 與 login，卻固定用 `registerSchema`
-    → **登入也被強制驗證密碼 ≥ 6**，這是隱藏耦合。
-  - `app.js` 的 CORS 只允許 `http://localhost:8000`，但程式碼註解誤寫成 5173。
-  - `PORT` 寫死在 app.js，未走 env（與其他服務慣例不一致）。
+  ### 已清除的遺留代碼（歷史記錄，非現況——見 mistake.md／執行日誌）
+  change `simplify-auth-service` 已移除：`middlewares/authMiddleware.js`（未掛載）、
+  `jwtHelper.verifyToken()`（無呼叫）、`authController.me()`（未掛路由）、`users.json`（死檔）；
+  也解除了 validateMiddleware 同時服務 register/login 的耦合（login 已不驗格式）；
+  repository 已由 `userApiClient.js` 改名為 `userRepository.js`；PORT/CORS_ORIGIN 已外部化到 env。
 
   ### 測試現況（實跑 npx jest 驗證）
-  - `authController.test.js`：8 個測試通過。
-  - `authService.test.js`：**整個 suite 掛掉**——它 mock 的是 `../repositories/userRepository.js`，
-    但真正的檔案叫 `userApiClient.js`，路徑不存在。要修：把測試裡的 userRepository 全改成 userApiClient。
-  - `userApiClient.js` 本身無單元測試。
+  - `authController.test.js`：7 個測試通過。
+  - `authService.test.js`：7 個測試通過（mock 路徑已對上改名後的 `userRepository.js`）。
+  - 合計 2 suites / 14 tests 全通過。`userRepository.js` 本身無單元測試（學習階段刻意不補）。
 
   ### 協作約定
   - 學習導向，優先解釋原理與設計思考。

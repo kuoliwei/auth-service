@@ -35,7 +35,7 @@ Node.js + Express 5 + ESM modules，三層架構 Controller → Service → Repo
 
 - 密碼雜湊：`authService.register()` 用 `bcrypt.hash(password, 10)`（saltRounds=10），登入用 `bcrypt.compare()`。明文密碼從不落地，也從不在 API 回應中出現。
 - JWT：`src/utils/jwtHelper.js` 用 `JWT_SECRET`（`.env`）簽發，payload 只含 `{ id: userId }`，效期 7 天。這個 secret 必須跟 `api-gateway` 的 `.env` 一致。
-- `userRepository.js` 把已雜湊的密碼透過 `POST http://localhost:4000/users` 存進 user-service，本服務自己沒有資料庫。
+- `userRepository.js` 把已雜湊的密碼透過 `POST {GATEWAY_URL}/internal/users`（預設 `http://localhost:8000/internal/users`）送給 api-gateway 轉發給 user-service 存檔，本服務自己沒有資料庫、也不直連 user-service。
 
 ## 演進歷史（重要背景）
 
