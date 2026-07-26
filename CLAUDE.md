@@ -67,6 +67,10 @@ Node.js + Express 5 + ESM modules，三層架構 Controller → Service → Repo
 
 （先前的遺留代碼 `authMiddleware.js`、`jwtHelper.verifyToken()`、`authController.me()`、`users.json` 已於 `simplify-auth-service` change 清除，見上方演進歷史第 6 點。）
 
-## 注意：與前端的整合落差
+## 與前端的整合（已查證，非缺口）
 
-`persona-nexus-auth` 登入成功後目前**沒有把拿到的 JWT 存進 localStorage**，也沒有導向大廳。也就是說即使本服務和 gateway 都正常簽發/驗證 token，使用者登入後仍無法真正進入需要 JWT 的頁面（大廳、角色編輯）。這個缺口在前端專案（`persona-nexus-auth`），與本服務無關，但會直接影響整個系統能否走完登入流程，需要留意。
+先前這裡記錄過「`persona-nexus-auth` 登入成功後沒存 token、沒跳轉」的缺口——**已查證為過時/錯誤說法**。
+實際讀 `persona-nexus-auth/src/main.js` 確認：登入成功後會把回應中的 `token` 帶在 URL query string，
+`setTimeout` 1.5 秒後導向大廳（`${LOBBY_APP_URL}/?token=...`）；`persona-nexus-lobby/src/main.js`
+會從 URL 讀出該 token 寫進 `localStorage` 後移除該參數。這條路徑是通的，不是缺口。
+詳見 `persona-nexus-auth/CLAUDE.md`「登入/註冊流程」一節。
