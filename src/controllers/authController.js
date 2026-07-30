@@ -8,13 +8,32 @@ const ERROR_MAP = {
 };
 const FALLBACK_ERROR = { status: 500, message: '伺服器內部發生錯誤，請稍後再試。' };
 
-// 依語意錯誤碼查表回應；未命中一律回退為 500。
-function respondError(res, error) {
-  console.error('💥 [崩潰] 核心層拋出錯誤！錯誤訊息：', error.message);
+/**
+ * 統一的錯誤回應（與 user / character / chat 三服務的 respondWithError 簽名一致）
+ *
+ * 判斷順序：端點特有的覆寫 → 共用 ERROR_MAP → 500。
+ * 目前本服務尚無同碼異義或動態內容的錯誤碼，`overrides`/`serviceErrorPrefix`
+ * 暫未使用，僅為與其他服務簽名一致、未來如有需求可直接沿用。
+ *
+ * @param {Object} res - Express response
+ * @param {Error} error - service 層拋出的語意錯誤
+ * @param {Object} [options]
+ * @param {Object} [options.overrides] - 端點特有的錯誤碼覆寫 `{ CODE: { status, message } }`
+ * @param {string} [options.serviceErrorPrefix] - 保留參數，本服務目前未使用
+ * @returns {Object} Express response
+ */
+function respondWithError(res, error, { overrides, serviceErrorPrefix } = {}) {
+  const override = overrides?.[error.message];
+  if (override) {
+    return res.status(override.status).json({ error: error.message, message: override.message });
+  }
+
   const mapped = ERROR_MAP[error.message];
   if (mapped) {
     return res.status(mapped.status).json({ error: error.message, message: mapped.message });
   }
+
+  console.error('💥 [崩潰] 核心層拋出錯誤！錯誤訊息：', error.message);
   return res.status(FALLBACK_ERROR.status).json({ error: 'INTERNAL_SERVER_ERROR', message: FALLBACK_ERROR.message });
 }
 
@@ -45,7 +64,7 @@ export const authController = {
       return res.status(201).json(result);
 
     } catch (error) {
-      return respondError(res, error);
+      return respondWithError(res, error);
     }
   },
   /**
@@ -73,7 +92,7 @@ export const authController = {
       return res.status(200).json(result);
 
     } catch (error) {
-      return respondError(res, error);
+      return respondWithError(res, error);
     }
   }
 };
