@@ -6,6 +6,12 @@ const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:8000';
 const BACKEND_GET_USER_BY_EMAIL_URL = `${GATEWAY_URL}/internal/users?email=`;
 const BACKEND_REGISTER_URL = `${GATEWAY_URL}/internal/users`;
 export const userRepository = {
+    /**
+     * 從 user-service 查詢指定信箱的用戶
+     * @param {string} email - 使用者信箱
+     * @returns {Promise<{id: string, email: string, password: string} | null>} 用戶物件，或 null 若不存在
+     * @throws {Error} 若 gateway 回傳 5xx 錯誤
+     */
     async findByEmail(email) {
         try {
             const response = await fetch(BACKEND_GET_USER_BY_EMAIL_URL + email, {
@@ -23,6 +29,12 @@ export const userRepository = {
             throw error;
         }
     },
+    /**
+     * 新增用戶到 user-service
+     * @param {{id: string, email: string, password: string}} newUser - 新用戶物件
+     * @returns {Promise<{id: string, email: string}>} 已存檔的用戶（不含密碼）
+     * @throws {Error} 若 gateway 回傳錯誤
+     */
     async save(newUser) {
         try {
             const requestBody = {

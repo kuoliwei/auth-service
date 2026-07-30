@@ -33,9 +33,8 @@ describe('AuthController (門神層) 單元測試', () => {
     // 斷言：成功建立，應回傳 201 狀態碼
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith({
-      status: 'success',
-      message: '註冊成功！',
-      data: { id: 'usr_9527', email: 'good@test.com' }
+      id: 'usr_9527',
+      email: 'good@test.com'
     });
   });
   // 【測試案例二：email已經存在資料庫中】
@@ -47,11 +46,11 @@ describe('AuthController (門神層) 單元測試', () => {
 
     await authController.register(req, res);
 
-    // 斷言：Controller 應該要擺臭臉給 400 狀態碼
-    expect(res.status).toHaveBeenCalledWith(400);
+    // 斷言：Controller 應該要擺臭臉給 409 狀態碼（Conflict）
+    expect(res.status).toHaveBeenCalledWith(409);
     // 斷言：回應的錯誤訊息應該要符合預期
     expect(res.json).toHaveBeenCalledWith({
-      status: 'error',
+      error: 'EMAIL_ALREADY_EXISTS',
       message: '該電子郵件已被註冊，請更換帳號。'
     });
   });
@@ -68,7 +67,7 @@ describe('AuthController (門神層) 單元測試', () => {
     expect(res.status).toHaveBeenCalledWith(500);
     // 斷言：回應的錯誤訊息應該要符合預期
     expect(res.json).toHaveBeenCalledWith({
-      status: 'error',
+      error: 'INTERNAL_SERVER_ERROR',
       message: '伺服器內部發生錯誤，請稍後再試。'
     });
   });
@@ -88,13 +87,9 @@ describe('AuthController (門神層) 單元測試', () => {
     // 斷言：成功登入，應回傳 200 狀態碼
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
-      status: 'success',
-      message: '登入成功！',
-      data: {
-        id: 'usr_9527',
-        email: 'good@test.com',
-        token: 'generated_token'
-      }
+      id: 'usr_9527',
+      email: 'good@test.com',
+      token: 'generated_token'
     });
   });
   // 【測試案例五：未知使用者】
@@ -110,7 +105,7 @@ describe('AuthController (門神層) 單元測試', () => {
     expect(res.status).toHaveBeenCalledWith(400);
     // 斷言：回應的錯誤訊息應該要符合預期
     expect(res.json).toHaveBeenCalledWith({
-      status: 'error',
+      error: 'UNKNOWN_USER',
       message: 'Email或密碼錯誤，請輸入正確的Email或密碼。'
     });
   });
@@ -127,7 +122,7 @@ describe('AuthController (門神層) 單元測試', () => {
     expect(res.status).toHaveBeenCalledWith(400);
     // 斷言：回應的錯誤訊息應該要符合預期
     expect(res.json).toHaveBeenCalledWith({
-      status: 'error',
+      error: 'EMAIL_OR_PASSWORD_NOTMATCH',
       message: 'Email或密碼錯誤，請輸入正確的Email或密碼。'
     });
   });
@@ -144,7 +139,7 @@ describe('AuthController (門神層) 單元測試', () => {
     expect(res.status).toHaveBeenCalledWith(500);
     // 斷言：回應的錯誤訊息應該要符合預期
     expect(res.json).toHaveBeenCalledWith({
-      status: 'error',
+      error: 'INTERNAL_SERVER_ERROR',
       message: '伺服器內部發生錯誤，請稍後再試。'
     });
   });

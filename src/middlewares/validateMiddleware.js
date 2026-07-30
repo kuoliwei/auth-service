@@ -7,7 +7,7 @@ export function validateMiddleware(req, res, next) {
         next();
     } catch (error) {
         return res.status(400).json({
-            status: 'error',
+            error: 'INVALID_INPUT',
             message: 'EMAIL或密碼格式不正確'
         });
     }

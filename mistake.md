@@ -74,3 +74,203 @@
 
 - **第 3 點**（validateMiddleware）是最「一石多鳥」的優化點——同時觸及 SRP、低耦合、契約明確三條原則。這也是討論之初就被指出的問題。
 - **第 4 點把握低**：JS 動態語言下 DIP/OCP 的違反不如靜態語言明確，如實標低，不灌水。是否處理由後續決定。
+
+---
+
+# 【新增】程式碼層面違反項稽核（2026-07-30）
+
+> **稽核基準**：《程式撰寫設計原則.md》（Phase 1 新建）  
+> **稽核視角**：從「單檔案結構、函數粒度、重複代碼、可讀性」等代碼層級重新審視  
+> **總體狀態**：✅ 程式碼品質良好，違反項輕微，多為「可讀性增強」級別
+
+## 違反項統計
+
+| 嚴重度 | 數量 | 類別 |
+|--------|------|------|
+| 🔴 高 | 0 | — |
+| 🟡 中 | 2 | C1（副作用隔離）、C2（狀態流透明） |
+| 🟢 低 | 5 | B3（函數簽名）、F2（註解品質） |
+| 📋 建議 | 3 | 錯誤格式統一、變數命名、區段註解 |
+
+---
+
+## 詳細違反項
+
+### 【中等嚴重度】
+
+#### ⚠️ **C1-1：副作用混雜在業務邏輯** `authService.js:11-48（register 方法）`
+
+**原則**：C1. 副作用隔離  
+**問題**：
+```javascript
+async register(email, password) {
+  try {
+    // 混雜了驗證、轉換、副作用、回傳
+    const existingUser = await userRepository.findByEmail(email)  // 副作用 1
+    if (existingUser) throw new Error('EMAIL_ALREADY_EXISTS')    // 驗證
+    const hashedPassword = await bcrypt.hash(password, 10)       // 轉換
+    const userId = 'usr_' + Date.now()                           // 轉換
+    const savedUser = await userRepository.save(newUser)         // 副作用 2
+    return { id: savedUser.id, email: savedUser.email }         // 回傳
+  } catch (error) { ... }
+}
+```
+
+**為什麼違反**：純邏輯（密碼雜湊、ID 生成）與副作用（DB 寫入）沒有清晰邊界，難以測試和改進。
+
+**嚴重度**：🟡 中（功能正常，但可測試性和改進空間有限）
+
+**優先度**：中（可留著，改進時再處理）
+
+---
+
+#### ⚠️ **C2-1：全域狀態隱性依賴** `userRepository.js:5-7`
+
+**原則**：C2. 狀態流透明  
+**問題**：
+```javascript
+const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:8000'
+const BACKEND_GET_USER_BY_EMAIL_URL = `${GATEWAY_URL}/internal/users?email=`
+```
+
+**為什麼違反**：檔案頂層初始化的常數在測試時無法動態覆寫，測試隔離困難。
+
+**嚴重度**：🟡 中（在微服務常見但非最佳實踐）
+
+**優先度**：低→中（現在可留著，測試時若遇隔離問題再改）
+
+---
+
+### 【低嚴重度】
+
+#### 🟢 **B3-1/B3-2：JSDoc 不完整** `authService.js:11, 54`
+
+**原則**：B3. 函數簽名清晰性  
+**問題**：
+```javascript
+/**
+ * 處理用戶註冊的核心業務邏輯
+ * @param {string} email 
+ * @param {string} password 
+ */
+async register(email, password) {
+  // 缺少：@throws 說明、@returns 結構、參數範圍限制
+}
+```
+
+**為什麼違反**：呼叫方需查代碼才知道會拋什麼錯、回傳什麼。
+
+**嚴重度**：🟢 低（改進建議，不影響功能）
+
+**優先度**：低
+
+---
+
+#### 🟢 **F2-1/F2-2：過度詳細的內部註解** `authService.js:38-47, 73-84`
+
+**原則**：F2. 註解與文件  
+**問題**：
+```javascript
+} catch (error) {
+  // 核心邏輯：如果是我們自己主動丟出的「Email重複」，就放行，不攔截牠！
+  if (error.message === 'EMAIL_ALREADY_EXISTS') { throw error }
+  // 如果走到這，代表真的是倉庫存取失敗、硬碟爆掉等「真正的未知錯誤」
+  throw new Error('UNKNOWN_SERVER_ERROR')
+}
+```
+
+**為什麼違反**：註解過度解釋「做什麼」而不是「為什麼」，且比喻不適合生產代碼。
+
+**嚴重度**：🟢 低（可讀性問題）
+
+**優先度**：低
+
+---
+
+#### 🟢 **B3-3：userRepository 方法無 JSDoc** `userRepository.js:9, 26`
+
+**原則**：B3. 函數簽名清晰性  
+**問題**：
+```javascript
+async findByEmail(email) {
+  // 無 JSDoc，回傳值類型不明確（物件或 null）
+}
+async save(newUser) {
+  // 無 JSDoc
+}
+```
+
+**嚴重度**：🟢 低
+
+**優先度**：低
+
+---
+
+### 【建議項】
+
+#### 📋 **validateMiddleware 錯誤格式不一致** `validateMiddleware.js:8-12`
+
+**問題**：
+```javascript
+// validateMiddleware
+return res.status(400).json({ status: 'error', message: '...' })
+
+// authController
+return res.status(400).json({ error: 'CODE', message: '...' })
+```
+
+**建議**：統一格式為 `{ error, message }`。
+
+**優先度**：低→中（不影響當前，但統一會讓前端更好處理）
+
+---
+
+#### 📋 **變數命名不夠清楚** `userRepository.js:28`
+
+**問題**：`const requestBody = { ... }` —— 過於泛稱。
+
+**建議**：改為 `gatewayRequestPayload` 更清楚。
+
+**優先度**：低
+
+---
+
+#### 📋 **缺少區段註解** `authService.js`
+
+**問題**：檔案只有 2 個方法，但後續可能增長。
+
+**建議**：加上 `// ========== 註冊 ==========` 區段分割。
+
+**優先度**：低（可選）
+
+---
+
+## 建議優化順序
+
+| 階段 | 工作 | 時間 | 優先度 |
+|------|------|------|--------|
+| 1 | 補完 JSDoc（register, login, userRepository） | 15 分鐘 | 低 |
+| 1 | 簡化 catch 區塊註解 | 5 分鐘 | 低 |
+| 1 | 統一 validateMiddleware 錯誤格式 | 5 分鐘 | 低→中 |
+| 2 | 改進 userRepository 環境變數處理（若增加測試） | 30 分鐘 | 低→中 |
+| 3 | 拆分 register/login 副作用邏輯（若改維護策略） | 40 分鐘 | 中 |
+
+---
+
+## 總體評估
+
+### ✅ 做得好的地方
+
+- 三層架構清晰，職責分離明確
+- 錯誤碼集中（ERROR_MAP），不用 if/else
+- 密碼安全（bcrypt），明文不落地
+- 無死代碼，無過度設計
+- **所有單元測試通過（14/14）**
+
+### ⚠️ 可改進的地方（優先級排序）
+
+1. **快速收益（10-15 分鐘）**：補完 JSDoc、簡化註解、統一錯誤格式
+2. **中期維護（30 分鐘）**：改進環境變數隔離（若要增加測試）
+3. **長期優化（40 分鐘）**：拆分副作用邏輯（視日後維護頻率）
+
+**結論**：現有代碼質量良好，所有違反項均為「增強級別」，無功能性或安全缺陷。

@@ -4,9 +4,12 @@ import { generateToken } from '../utils/jwtHelper.js'
 
 export const authService = {
   /**
-   * 處理用戶註冊的核心業務邏輯
-   * @param {string} email 
-   * @param {string} password 
+   * 註冊新用戶
+   * @param {string} email - 使用者信箱（格式由 validateMiddleware 檢查）
+   * @param {string} password - 密碼（雜湊後由 userRepository 存檔）
+   * @returns {Promise<{id: string, email: string}>} 已存檔的用戶物件（不含密碼）
+   * @throws {Error} 'EMAIL_ALREADY_EXISTS' 若信箱已被註冊
+   * @throws {Error} 'UNKNOWN_SERVER_ERROR' 若 userRepository 發生非預期錯誤
    */
   async register(email, password) {
     try {
@@ -36,21 +39,23 @@ export const authService = {
         email: savedUser.email
       };
     } catch (error) {
-      // 核心邏輯：如果是我們自己主動丟出的「Email重複」，就放行，不攔截牠！
+      // 業務錯誤（已預期的）直接拋給 controller
       if (error.message === 'EMAIL_ALREADY_EXISTS') {
         throw error;
       }
-      console.error('真正的錯誤：', error);
-      // 如果走到這，代表真的是倉庫存取失敗、硬碟爆掉等「真正的未知錯誤」
-      // 在這裡我們可以先做點別的事，例如 console.error('倉庫爆了：', error);
+      console.error('userRepository 發生非預期錯誤：', error);
       throw new Error('UNKNOWN_SERVER_ERROR');
     }
   },
   /**
-  * 處理用戶登入的核心業務邏輯
-  * @param {string} email 
-  * @param {string} password 
-  */
+   * 驗證用戶登入
+   * @param {string} email - 使用者信箱
+   * @param {string} password - 明文密碼
+   * @returns {Promise<{id: string, email: string, token: string}>} 登入成功的使用者與 JWT token
+   * @throws {Error} 'UNKNOWN_USER' 若信箱未被註冊
+   * @throws {Error} 'EMAIL_OR_PASSWORD_NOTMATCH' 若密碼錯誤
+   * @throws {Error} 'UNKNOWN_SERVER_ERROR' 若 userRepository 發生非預期錯誤
+   */
   async login(email, password) {
     try {
       // 1. 重複性檢查：叫倉管（Repository）去查這個 Email 有沒有被註冊過
@@ -71,16 +76,14 @@ export const authService = {
         token: token
       };
     } catch (error) {
-      // 核心邏輯：如果是我們自己主動丟出的ERROR，就放行，不攔截牠！
+      // 業務錯誤（已預期的）直接拋給 controller
       if (error.message === 'UNKNOWN_USER') {
         throw error;
       }
       else if (error.message === 'EMAIL_OR_PASSWORD_NOTMATCH') {
         throw error;
       }
-      console.error('真正的錯誤：', error);
-      // 如果走到這，代表真的是倉庫存取失敗、硬碟爆掉等「真正的未知錯誤」
-      // 在這裡我們可以先做點別的事，例如 console.error('倉庫爆了：', error);
+      console.error('userRepository 發生非預期錯誤：', error);
       throw new Error('UNKNOWN_SERVER_ERROR');
     }
   }
